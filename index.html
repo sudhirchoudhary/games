@@ -621,10 +621,9 @@ function layoutCrossword(wordStrings) {
             }
         }
         if (candidates.length) {
-            // Pick placement that creates the largest bounding box (most spread)
-            let best = candidates[0], bestSpread = 0;
+            // Pick COMPACT placement — smallest bounding box, most crossings
+            let best = candidates[0], bestScore = Infinity;
             for (const c of candidates) {
-                // Simulate bounding box if we placed this word
                 let minR2=Infinity,maxR2=-Infinity,minC2=Infinity,maxC2=-Infinity;
                 placed.forEach(p=>{
                     for(let i=0;i<p.word.length;i++){
@@ -640,8 +639,11 @@ function layoutCrossword(wordStrings) {
                     minR2=Math.min(minR2,r);maxR2=Math.max(maxR2,r);
                     minC2=Math.min(minC2,cl);maxC2=Math.max(maxC2,cl);
                 }
-                const spread=(maxR2-minR2+1)+(maxC2-minC2+1);
-                if(spread>bestSpread){ bestSpread=spread; best=c; }
+                const rows=(maxR2-minR2+1), cols=(maxC2-minC2+1);
+                // Penalize grids wider than 10 or taller than 12
+                const penalty = Math.max(0,cols-10)*5 + Math.max(0,rows-12)*5;
+                const score = Math.max(rows,cols) + penalty;
+                if(score<bestScore){ bestScore=score; best=c; }
             }
             doPlace(best.word, best.row, best.col, best.dir);
         }
@@ -744,8 +746,9 @@ function drawGrid() {
     // Calculate cell size to fit both dimensions
     const szW=Math.floor((availW-(G.cols-1)*gap)/G.cols);
     const szH=Math.floor((availH-(G.rows-1)*gap)/G.rows);
-    const sz=Math.min(szW, szH, 44);
-    const fs=Math.max(Math.round(sz*0.44),11);
+    // Allow cells to shrink to 22px for big grids, cap at 44px
+    const sz=Math.max(Math.min(szW, szH, 44), 18);
+    const fs=Math.max(Math.round(sz*0.44),9);
     el.style.gap=gap+'px';
     for(let r=0;r<G.rows;r++){
         const row=document.createElement('div'); row.className='cw-row';
