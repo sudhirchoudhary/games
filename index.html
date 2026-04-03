@@ -161,6 +161,108 @@
         .mb2 { background:#ecf0f1; color:#333; }
         .shake { animation:shake 0.4s ease; }
         @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+
+        /* ── Enhanced Animations ── */
+        .cw-cell.filled {
+            animation: popReveal 0.45s cubic-bezier(.17,.67,.35,1.4);
+        }
+        @keyframes popReveal {
+            0%  { transform:scale(0.3) rotate(-15deg); opacity:0; }
+            50% { transform:scale(1.15) rotate(3deg); opacity:1; }
+            100%{ transform:scale(1) rotate(0deg); opacity:1; }
+        }
+        .cw-cell.has { transition: background 0.3s, transform 0.2s, box-shadow 0.3s; }
+        .cw-cell.hint-glow {
+            box-shadow: 0 0 16px 4px rgba(241,196,15,0.7), 0 2px 8px rgba(0,0,0,0.15);
+            animation: hintPulse 0.8s ease;
+        }
+        @keyframes hintPulse {
+            0%,100% { box-shadow: 0 0 8px 2px rgba(241,196,15,0.4); }
+            50% { box-shadow: 0 0 20px 6px rgba(241,196,15,0.8); }
+        }
+
+        /* Letter wheel selection ripple */
+        .wl.sel {
+            transform:scale(1.2)!important;
+            background:linear-gradient(135deg,#fff,#f1c40f);
+            box-shadow:0 0 22px rgba(241,196,15,0.7);
+            animation: letterPop 0.15s ease-out;
+        }
+        @keyframes letterPop {
+            0%   { transform:scale(1); }
+            50%  { transform:scale(1.35); }
+            100% { transform:scale(1.2); }
+        }
+
+        /* Word found flash on current-word pill */
+        .cur-word-txt.ok {
+            animation: wordOk 0.5s ease;
+        }
+        @keyframes wordOk {
+            0%   { transform:scale(1); }
+            30%  { transform:scale(1.15); box-shadow:0 0 24px rgba(46,204,113,0.7); }
+            100% { transform:scale(1); }
+        }
+        .cur-word-txt.bonus {
+            animation: wordBonus 0.5s ease;
+        }
+        @keyframes wordBonus {
+            0%   { transform:scale(1); }
+            30%  { transform:scale(1.15); box-shadow:0 0 24px rgba(52,152,219,0.7); }
+            100% { transform:scale(1); }
+        }
+
+        /* Shuffle spin */
+        .cbtn.spinning { animation: spinBtn 0.4s ease; }
+        @keyframes spinBtn { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+
+        /* Particle container */
+        .particles { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:99; overflow:hidden; }
+        .particle {
+            position:absolute; border-radius:50%; pointer-events:none;
+            animation: particleFly 0.9s ease-out forwards;
+        }
+        @keyframes particleFly {
+            0%   { opacity:1; transform:translate(0,0) scale(1); }
+            100% { opacity:0; transform:translate(var(--dx),var(--dy)) scale(0); }
+        }
+
+        /* Level complete confetti */
+        .confetti {
+            position:absolute; width:8px; height:8px; border-radius:2px;
+            animation: confettiFall var(--dur) ease-in forwards;
+            pointer-events:none;
+        }
+        @keyframes confettiFall {
+            0%   { opacity:1; transform:translateY(0) rotate(0deg); }
+            100% { opacity:0; transform:translateY(var(--fall)) rotate(var(--rot)); }
+        }
+
+        /* Score bump */
+        .score-bump { animation: scorePop 0.3s ease; }
+        @keyframes scorePop {
+            0%   { transform:scale(1); }
+            50%  { transform:scale(1.3); color:#2ecc71; }
+            100% { transform:scale(1); }
+        }
+
+        /* Shimmer on grid cells for unfound words */
+        .cw-cell.has:not(.filled) {
+            animation: subtleShimmer 3s ease-in-out infinite;
+        }
+        @keyframes subtleShimmer {
+            0%,100% { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+            50%     { box-shadow: 0 2px 12px rgba(255,255,255,0.3); }
+        }
+
+        /* Modal enhanced entrance */
+        .modal {
+            animation: modalPop 0.45s cubic-bezier(.17,.67,.35,1.2);
+        }
+        @keyframes modalPop {
+            0%   { transform:translateY(40px) scale(0.9); opacity:0; }
+            100% { transform:translateY(0) scale(1); opacity:1; }
+        }
     </style>
     <script>
         window.GAME_CONFIG = {
@@ -189,6 +291,7 @@
         </div>
     </div>
 </div>
+<div class="particles" id="particles"></div>
 <div class="modal-bg" id="mBg">
     <div class="modal">
         <h2>Level Complete!</h2>
@@ -680,6 +783,189 @@ const LEVELS = LEVEL_DEFS.map(def => {
 });
 
 /* ═══════════════════════════════════════════════
+   SOUND ENGINE (Web Audio API — no external files)
+   ═══════════════════════════════════════════════ */
+let _actx = null;
+function getACtx() {
+    if (!_actx) _actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (_actx.state === 'suspended') _actx.resume();
+    return _actx;
+}
+
+const SFX = {
+    // letter selected — short bright tick
+    tick(pitch) {
+        const ctx = getACtx();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = 600 + (pitch || 0) * 80;
+        g.gain.setValueAtTime(0.12, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.08);
+    },
+
+    // word found — ascending arpeggio
+    wordFound() {
+        const ctx = getACtx();
+        const notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
+        notes.forEach((freq, i) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sine';
+            o.frequency.value = freq;
+            const t = ctx.currentTime + i * 0.07;
+            g.gain.setValueAtTime(0.15, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+            o.connect(g); g.connect(ctx.destination);
+            o.start(t); o.stop(t + 0.18);
+        });
+    },
+
+    // bonus word — sparkle sound
+    bonus() {
+        const ctx = getACtx();
+        [880, 1109, 1320].forEach((freq, i) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'triangle';
+            o.frequency.value = freq;
+            const t = ctx.currentTime + i * 0.06;
+            g.gain.setValueAtTime(0.1, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+            o.connect(g); g.connect(ctx.destination);
+            o.start(t); o.stop(t + 0.15);
+        });
+    },
+
+    // invalid word — low buzz
+    invalid() {
+        const ctx = getACtx();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sawtooth';
+        o.frequency.value = 150;
+        g.gain.setValueAtTime(0.08, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.2);
+    },
+
+    // level complete — triumphant fanfare
+    levelComplete() {
+        const ctx = getACtx();
+        const melody = [523, 659, 784, 1047, 1319, 1568]; // C E G C E G
+        melody.forEach((freq, i) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = i < 3 ? 'sine' : 'triangle';
+            o.frequency.value = freq;
+            const t = ctx.currentTime + i * 0.1;
+            g.gain.setValueAtTime(0.13, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+            o.connect(g); g.connect(ctx.destination);
+            o.start(t); o.stop(t + 0.3);
+        });
+    },
+
+    // shuffle — whoosh
+    shuffle() {
+        const ctx = getACtx();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(800, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.2);
+        g.gain.setValueAtTime(0.08, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.2);
+    },
+
+    // hint — soft chime
+    hint() {
+        const ctx = getACtx();
+        [660, 880].forEach((freq, i) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sine';
+            o.frequency.value = freq;
+            const t = ctx.currentTime + i * 0.12;
+            g.gain.setValueAtTime(0.1, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+            o.connect(g); g.connect(ctx.destination);
+            o.start(t); o.stop(t + 0.25);
+        });
+    },
+
+    // already found — gentle nudge
+    alreadyFound() {
+        const ctx = getACtx();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = 300;
+        g.gain.setValueAtTime(0.06, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.15);
+    }
+};
+
+/* ═══════════════════════════════════════════════
+   HAPTICS
+   ═══════════════════════════════════════════════ */
+function haptic(pattern) {
+    if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+/* ═══════════════════════════════════════════════
+   PARTICLE EFFECTS
+   ═══════════════════════════════════════════════ */
+function spawnParticles(x, y, color, count) {
+    const container = document.getElementById('particles');
+    for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        const sz = 4 + Math.random() * 6;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 60;
+        p.style.cssText = `
+            width:${sz}px; height:${sz}px;
+            left:${x-sz/2}px; top:${y-sz/2}px;
+            background:${color};
+            --dx:${Math.cos(angle)*dist}px;
+            --dy:${Math.sin(angle)*dist}px;
+        `;
+        container.appendChild(p);
+        setTimeout(() => p.remove(), 900);
+    }
+}
+
+function spawnConfetti() {
+    const container = document.getElementById('particles');
+    const colors = ['#2ecc71','#3498db','#f1c40f','#e74c3c','#9b59b6','#e67e22','#1abc9c'];
+    for (let i = 0; i < 50; i++) {
+        const c = document.createElement('div');
+        c.className = 'confetti';
+        const x = Math.random() * window.innerWidth;
+        const fall = 200 + Math.random() * 400;
+        const dur = 0.8 + Math.random() * 1.2;
+        const rot = (Math.random() - 0.5) * 720;
+        c.style.cssText = `
+            left:${x}px; top:${-10 + Math.random()*50}px;
+            background:${colors[i%colors.length]};
+            width:${5+Math.random()*8}px; height:${5+Math.random()*8}px;
+            border-radius:${Math.random()>0.5?'50%':'2px'};
+            --fall:${fall}px; --rot:${rot}deg; --dur:${dur}s;
+        `;
+        container.appendChild(c);
+        setTimeout(() => c.remove(), dur * 1000);
+    }
+}
+
+/* ═══════════════════════════════════════════════
    GAME STATE
    ═══════════════════════════════════════════════ */
 const G = {
@@ -823,7 +1109,7 @@ function drawLines(){
 /* ═══════════════════════════════════════════════
    SELECTION + WORD CHECKING
    ═══════════════════════════════════════════════ */
-function startS(idx){ G.drag=true; G.sel=[idx]; refSel(); }
+function startS(idx){ G.drag=true; G.sel=[idx]; SFX.tick(0); haptic(10); refSel(); }
 function moveS(cx,cy){
     if(!G.drag) return;
     document.querySelectorAll('.wl').forEach(b=>{
@@ -831,7 +1117,7 @@ function moveS(cx,cy){
         const bx=rc.left+rc.width/2, by=rc.top+rc.height/2;
         if(Math.hypot(cx-bx,cy-by)<rc.width*0.55){
             const idx=parseInt(b.dataset.i);
-            if(!G.sel.includes(idx)){ G.sel.push(idx); refSel(); }
+            if(!G.sel.includes(idx)){ G.sel.push(idx); SFX.tick(G.sel.length); haptic(8); refSel(); }
         }
     });
 }
@@ -860,6 +1146,13 @@ function endS(){
         G.found.add(match.word);
         G.score+=word.length*10;
         placeWord(match); hud();
+        SFX.wordFound(); haptic([20,30,20]);
+        // Particles from the current-word pill
+        const cwRect=cw.getBoundingClientRect();
+        spawnParticles(cwRect.left+cwRect.width/2, cwRect.top, '#2ecc71', 12);
+        // Score bump
+        document.getElementById('sc').classList.add('score-bump');
+        setTimeout(()=>document.getElementById('sc').classList.remove('score-bump'),300);
         cw.textContent=word; cw.classList.add('ok');
         setTimeout(()=>{ cw.classList.remove('ok'); resetCW();
             if(G.found.size===lv.words.length) showModal();
@@ -869,6 +1162,7 @@ function endS(){
 
     // Already found
     if(G.found.has(word) || G.foundBonus.has(word)){
+        SFX.alreadyFound(); haptic(15);
         cw.textContent='Already found';
         setTimeout(resetCW, 600);
         G.sel=[]; refSel(); return;
@@ -880,6 +1174,11 @@ function endS(){
         G.foundBonus.add(word);
         G.score+=word.length*5;
         hud();
+        SFX.bonus(); haptic([10,20,10]);
+        const cwRect2=cw.getBoundingClientRect();
+        spawnParticles(cwRect2.left+cwRect2.width/2, cwRect2.top, '#3498db', 10);
+        document.getElementById('sc').classList.add('score-bump');
+        setTimeout(()=>document.getElementById('sc').classList.remove('score-bump'),300);
         cw.textContent=word; cw.classList.add('bonus');
         // Show bonus toast
         const toast=document.createElement('div'); toast.className='bonus-toast';
@@ -890,6 +1189,7 @@ function endS(){
     }
 
     // Invalid
+    SFX.invalid(); haptic([30,20,30]);
     cw.classList.add('shake');
     setTimeout(()=>{ cw.classList.remove('shake'); resetCW(); },400);
     G.sel=[]; refSel();
@@ -917,7 +1217,11 @@ function placeWord(wo){
         const c=wo.dir==='across'?wo.col+i:wo.col;
         const cell=document.querySelector('.cw-cell[data-r="'+r+'"][data-c="'+c+'"]');
         if(cell&&!cell.classList.contains('filled')){
-            cell.classList.add('filled'); cell.textContent=wo.word[i];
+            // Staggered reveal — each letter pops in sequence
+            setTimeout(()=>{
+                cell.classList.add('filled'); cell.textContent=wo.word[i];
+                cell.style.animationDelay='0s';
+            }, i * 60);
         }
     }
 }
@@ -940,15 +1244,26 @@ function hint(){
     const lv=LEVELS[G.lvl-1];
     const uf=lv.words.filter(w=>!G.found.has(w.word));
     if(!uf.length) return;
+    SFX.hint(); haptic([15,30,15]);
     const w=uf[Math.floor(Math.random()*uf.length)];
     G.found.add(w.word); placeWord(w);
     G.hints--; hud();
     if(G.found.size===lv.words.length) setTimeout(showModal,400);
 }
 
-function doShuf(){ drawWheel(LEVELS[G.lvl-1]); G.sel=[]; refSel(); }
+function doShuf(){
+    SFX.shuffle(); haptic(15);
+    const btn=document.getElementById('shufBtn');
+    btn.classList.add('spinning');
+    setTimeout(()=>btn.classList.remove('spinning'),400);
+    drawWheel(LEVELS[G.lvl-1]); G.sel=[]; refSel();
+}
 
 function showModal(){
+    SFX.levelComplete(); haptic([30,50,30,50,30]);
+    spawnConfetti();
+    // Second wave of confetti
+    setTimeout(spawnConfetti, 400);
     document.getElementById('mSc').textContent=G.score;
     const bm=document.getElementById('bonusMsg');
     bm.textContent=G.foundBonus.size?'Bonus words found: '+G.foundBonus.size:'';
