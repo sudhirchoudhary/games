@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Word Finder</title>
-    <!-- standalone mode -->
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
@@ -74,9 +74,11 @@
         }
         .cur-word-txt.ok {
             background:linear-gradient(135deg,#2ecc71,#27ae60); color:#fff;
+            will-change:transform; animation: wordOk 0.45s ease;
         }
         .cur-word-txt.bonus {
             background:linear-gradient(135deg,#3498db,#2980b9); color:#fff;
+            will-change:transform; animation: wordBonus 0.45s ease;
         }
         .bonus-toast {
             position:absolute; top:-28px; left:50%; transform:translateX(-50%);
@@ -106,8 +108,9 @@
             position:absolute; top:50%; left:50%;
             transform:translate(-50%,-50%);
             border-radius:50%;
-            background:rgba(255,255,255,0.05);
-            border:2px solid rgba(255,255,255,0.08);
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.06) 70%, transparent 100%);
+            border:2.5px solid rgba(255,255,255,0.2);
+            box-shadow: inset 0 0 30px rgba(255,255,255,0.05), 0 0 15px rgba(125,60,152,0.3);
         }
         .wl {
             position:absolute; border-radius:50%;
@@ -149,9 +152,8 @@
         .modal {
             background:#fff; border-radius:20px; padding:28px 24px;
             text-align:center; max-width:280px; width:88%;
-            animation:slideUp 0.35s ease;
+            animation: modalPop 0.4s cubic-bezier(.17,.67,.35,1.2);
         }
-        @keyframes slideUp { from{transform:translateY(36px);opacity:0} to{transform:translateY(0);opacity:1} }
         .modal h2 { color:#7D3C98; font-size:24px; margin-bottom:6px; }
         .modal p  { color:#666; font-size:13px; margin:3px 0; }
         .modal-btns { display:flex; gap:8px; justify-content:center; margin-top:16px; }
@@ -160,6 +162,29 @@
         .mb1 { background:#7D3C98; color:#fff; }
         .mb2 { background:#ecf0f1; color:#333; }
         .shake { animation:shake 0.4s ease; }
+
+        /* Difficulty selector screen */
+        .diff-screen {
+            position:fixed; inset:0; z-index:200;
+            background: linear-gradient(160deg, #5B2C6F 0%, #7D3C98 40%, #A569BD 100%);
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:16px; padding:24px;
+        }
+        .diff-screen.hidden { display:none; }
+        .diff-screen h1 { color:#fff; font-size:28px; margin-bottom:8px; }
+        .diff-screen p  { color:rgba(255,255,255,0.7); font-size:13px; margin-bottom:12px; }
+        .diff-btn {
+            width:220px; padding:16px 24px; border:none; border-radius:16px;
+            font-size:16px; font-weight:700; cursor:pointer;
+            color:#fff; letter-spacing:1px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.15s;
+        }
+        .diff-btn:active { transform:scale(0.95); }
+        .diff-btn.easy   { background:linear-gradient(135deg,#2ecc71,#27ae60); }
+        .diff-btn.medium { background:linear-gradient(135deg,#f1c40f,#e67e22); color:#333; }
+        .diff-btn.hard   { background:linear-gradient(135deg,#e74c3c,#c0392b); }
+        .diff-btn small  { display:block; font-size:10px; font-weight:400; opacity:0.8; margin-top:4px; letter-spacing:0; }
         @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
 
         /* ── Enhanced Animations (GPU-composited only) ── */
@@ -175,9 +200,7 @@
             100% { box-shadow: 0 0 8px 2px rgba(241,196,15,0.3); }
         }
 
-        /* Word found flash — will-change for GPU layer */
-        .cur-word-txt.ok  { will-change:transform; animation: wordOk 0.45s ease; }
-        .cur-word-txt.bonus { will-change:transform; animation: wordBonus 0.45s ease; }
+        /* Word found flash keyframes */
         @keyframes wordOk {
             0%   { transform:scale(1); }
             35%  { transform:scale(1.12); box-shadow:0 0 20px rgba(46,204,113,0.6); }
@@ -224,8 +247,7 @@
             100% { transform:scale(1); }
         }
 
-        /* Modal enhanced entrance */
-        .modal { animation: modalPop 0.4s cubic-bezier(.17,.67,.35,1.2); }
+        /* Modal entrance keyframes */
         @keyframes modalPop {
             0%   { transform:translateY(36px) scale(0.92); opacity:0; }
             100% { transform:translateY(0) scale(1); opacity:1; }
@@ -240,11 +262,18 @@
     </script>
 </head>
 <body>
-<div class="game-wrap" id="gameWrap">
+<div class="diff-screen" id="diffScreen">
+    <h1>Word Finder</h1>
+    <p>Choose your difficulty</p>
+    <button class="diff-btn easy" onclick="startGame('EASY')">EASY<small>5-6 words per level</small></button>
+    <button class="diff-btn medium" onclick="startGame('MEDIUM')">MEDIUM<small>7-8 words per level</small></button>
+    <button class="diff-btn hard" onclick="startGame('HARD')">HARD<small>9-10 words per level</small></button>
+</div>
+<div class="game-wrap" id="gameWrap" style="display:none">
     <div class="hdr">
         <div class="hdr-pill">Score <span id="sc">0</span></div>
         <div class="hdr-pill diff-pill" id="diff">EASY</div>
-        <div class="hdr-pill">Lv <span id="lv">1</span>/<span id="lt">55</span></div>
+        <div class="hdr-pill">Lv <span id="lv">1</span></div>
     </div>
     <div class="words-counter" id="wc">Words: 0/0</div>
     <div class="grid-area"><div class="cw-grid" id="grid"></div></div>
@@ -279,340 +308,6 @@ const DICT = new Set(["ACE", "ACT", "ADD", "AGE", "AID", "AIM", "AIR", "ALL", "A
    Grid words: placed in crossword (5-8 per level)
    Bonus words: valid words accepted for extra points
    ═══════════════════════════════════════════════ */
-const LEVEL_DEFS = [
-// === EASY (1-20) ===
-{d:'EASY',
- w:['SNACK','CANS','SACK','SANK','SCAN','CAN','SAC'],
- letters:['A','C','K','N','S'],
- placements:[
-   {word:'SNACK',row:3,col:0,dir:'across'},
-   {word:'CANS',row:3,col:3,dir:'down'},
-   {word:'SACK',row:0,col:4,dir:'down'},
-   {word:'SANK',row:6,col:3,dir:'across'},
-   {word:'SCAN',row:0,col:1,dir:'down'},
-   {word:'CAN',row:4,col:5,dir:'down'},
-   {word:'SAC',row:3,col:0,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['DWARF','DRAW','WARD','FAR','RAW','WAD','WAR'],
- letters:['A','D','F','R','W'],
- placements:[
-   {word:'DWARF',row:4,col:2,dir:'across'},
-   {word:'DRAW',row:1,col:3,dir:'down'},
-   {word:'WARD',row:1,col:0,dir:'across'},
-   {word:'FAR',row:4,col:6,dir:'down'},
-   {word:'RAW',row:6,col:6,dir:'across'},
-   {word:'WAD',row:0,col:1,dir:'down'},
-   {word:'WAR',row:6,col:8,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['SHAFT','FAST','ASH','FAT','HAS','HAT','SAT'],
- letters:['A','F','H','S','T'],
- placements:[
-   {word:'SHAFT',row:4,col:0,dir:'across'},
-   {word:'FAST',row:4,col:3,dir:'down'},
-   {word:'ASH',row:6,col:2,dir:'across'},
-   {word:'FAT',row:2,col:4,dir:'down'},
-   {word:'HAS',row:2,col:0,dir:'down'},
-   {word:'HAT',row:2,col:0,dir:'across'},
-   {word:'SAT',row:0,col:2,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['STALK','LAST','SALT','SLAT','TALK','TASK','SAT'],
- letters:['A','K','L','S','T'],
- placements:[
-   {word:'STALK',row:3,col:2,dir:'across'},
-   {word:'LAST',row:2,col:4,dir:'down'},
-   {word:'SALT',row:5,col:1,dir:'across'},
-   {word:'SLAT',row:5,col:1,dir:'down'},
-   {word:'TALK',row:0,col:6,dir:'down'},
-   {word:'TASK',row:7,col:0,dir:'across'},
-   {word:'SAT',row:0,col:4,dir:'across'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['PLUMB','BUMP','LUMP','PLUM','BUM','PUB','UMP'],
- letters:['B','L','M','P','U'],
- placements:[
-   {word:'PLUMB',row:3,col:2,dir:'across'},
-   {word:'BUMP',row:0,col:2,dir:'down'},
-   {word:'LUMP',row:1,col:5,dir:'down'},
-   {word:'PLUM',row:1,col:4,dir:'across'},
-   {word:'BUM',row:2,col:0,dir:'across'},
-   {word:'PUB',row:0,col:0,dir:'across'},
-   {word:'UMP',row:0,col:7,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['DITCH','CHIT','ITCH','CHI','HID','HIT','TIC'],
- letters:['C','D','H','I','T'],
- placements:[
-   {word:'DITCH',row:3,col:1,dir:'across'},
-   {word:'CHIT',row:0,col:3,dir:'down'},
-   {word:'ITCH',row:1,col:0,dir:'across'},
-   {word:'CHI',row:3,col:4,dir:'down'},
-   {word:'HID',row:5,col:3,dir:'across'},
-   {word:'HIT',row:5,col:3,dir:'down'},
-   {word:'TIC',row:7,col:3,dir:'across'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['CHUMP','CHUM','HUMP','MUCH','CUP','HUM','UMP'],
- letters:['C','H','M','P','U'],
- placements:[
-   {word:'CHUMP',row:4,col:0,dir:'across'},
-   {word:'CHUM',row:3,col:1,dir:'down'},
-   {word:'HUMP',row:1,col:4,dir:'down'},
-   {word:'MUCH',row:4,col:3,dir:'down'},
-   {word:'CUP',row:6,col:3,dir:'across'},
-   {word:'HUM',row:1,col:4,dir:'across'},
-   {word:'UMP',row:0,col:6,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['CLOWN','COW','LOW','NOW','OWL','OWN','WON'],
- letters:['C','L','N','O','W'],
- placements:[
-   {word:'CLOWN',row:1,col:1,dir:'across'},
-   {word:'COW',row:1,col:1,dir:'down'},
-   {word:'LOW',row:0,col:3,dir:'down'},
-   {word:'NOW',row:1,col:5,dir:'down'},
-   {word:'OWL',row:3,col:0,dir:'across'},
-   {word:'OWN',row:3,col:0,dir:'down'},
-   {word:'WON',row:3,col:5,dir:'across'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['DUKES','DESK','DUKE','DUSK','USED','DUE','USE'],
- letters:['D','E','K','S','U'],
- placements:[
-   {word:'DUKES',row:2,col:2,dir:'across'},
-   {word:'DESK',row:0,col:6,dir:'down'},
-   {word:'DUKE',row:0,col:4,dir:'down'},
-   {word:'DUSK',row:0,col:6,dir:'across'},
-   {word:'USED',row:0,col:1,dir:'across'},
-   {word:'DUE',row:2,col:2,dir:'down'},
-   {word:'USE',row:4,col:0,dir:'across'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['STOVE','VEST','VOTE','SET','SOT','TOE','VET'],
- letters:['E','O','S','T','V'],
- placements:[
-   {word:'STOVE',row:2,col:0,dir:'across'},
-   {word:'VEST',row:1,col:4,dir:'down'},
-   {word:'VOTE',row:0,col:1,dir:'down'},
-   {word:'SET',row:4,col:2,dir:'across'},
-   {word:'SOT',row:3,col:4,dir:'across'},
-   {word:'TOE',row:3,col:6,dir:'down'},
-   {word:'VET',row:1,col:4,dir:'across'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['FLUNG','GULF','FLU','FUN','GNU','GUN','LUG'],
- letters:['F','G','L','N','U'],
- placements:[
-   {word:'FLUNG',row:2,col:2,dir:'across'},
-   {word:'GULF',row:1,col:4,dir:'down'},
-   {word:'FLU',row:4,col:4,dir:'across'},
-   {word:'FUN',row:2,col:2,dir:'down'},
-   {word:'GNU',row:3,col:0,dir:'across'},
-   {word:'GUN',row:3,col:0,dir:'down'},
-   {word:'LUG',row:0,col:6,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['FILTH','FLIT','HILT','LIFT','FIT','HIT','LIT'],
- letters:['F','H','I','L','T'],
- placements:[
-   {word:'FILTH',row:2,col:3,dir:'across'},
-   {word:'FLIT',row:2,col:3,dir:'down'},
-   {word:'HILT',row:5,col:0,dir:'across'},
-   {word:'LIFT',row:4,col:1,dir:'down'},
-   {word:'FIT',row:0,col:6,dir:'down'},
-   {word:'HIT',row:2,col:7,dir:'down'},
-   {word:'LIT',row:4,col:5,dir:'across'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['GUILT','GILT','GLUT','GUT','LIT','LUG','TUG'],
- letters:['G','I','L','T','U'],
- placements:[
-   {word:'GUILT',row:3,col:2,dir:'across'},
-   {word:'GILT',row:0,col:6,dir:'down'},
-   {word:'GLUT',row:3,col:2,dir:'down'},
-   {word:'GUT',row:6,col:0,dir:'across'},
-   {word:'LIT',row:3,col:5,dir:'down'},
-   {word:'LUG',row:0,col:4,dir:'across'},
-   {word:'TUG',row:4,col:0,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['SIXTH','HITS','HIS','HIT','ITS','SIT','SIX'],
- letters:['H','I','S','T','X'],
- placements:[
-   {word:'SIXTH',row:2,col:1,dir:'across'},
-   {word:'HITS',row:1,col:2,dir:'down'},
-   {word:'HIS',row:2,col:5,dir:'down'},
-   {word:'HIT',row:0,col:4,dir:'down'},
-   {word:'ITS',row:4,col:0,dir:'across'},
-   {word:'SIT',row:4,col:5,dir:'across'},
-   {word:'SIX',row:3,col:0,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['STUNK','STUN','SUNK','TUSK','NUT','SUN','TUN'],
- letters:['K','N','S','T','U'],
- placements:[
-   {word:'STUNK',row:4,col:1,dir:'across'},
-   {word:'STUN',row:4,col:1,dir:'down'},
-   {word:'SUNK',row:2,col:4,dir:'down'},
-   {word:'TUSK',row:6,col:0,dir:'across'},
-   {word:'NUT',row:2,col:2,dir:'down'},
-   {word:'SUN',row:2,col:4,dir:'across'},
-   {word:'TUN',row:0,col:6,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['MOUNT','UNTO','NOT','NUT','OUT','TON','TUN'],
- letters:['M','N','O','T','U'],
- placements:[
-   {word:'MOUNT',row:3,col:0,dir:'across'},
-   {word:'UNTO',row:0,col:1,dir:'down'},
-   {word:'NOT',row:3,col:3,dir:'down'},
-   {word:'NUT',row:5,col:1,dir:'across'},
-   {word:'OUT',row:1,col:4,dir:'down'},
-   {word:'TON',row:1,col:3,dir:'across'},
-   {word:'TUN',row:0,col:0,dir:'across'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['LATCH','CHAT','HALT','ACT','CAT','HAT'],
- letters:['A','C','H','L','T'],
- placements:[
-   {word:'LATCH',row:4,col:0,dir:'across'},
-   {word:'CHAT',row:2,col:1,dir:'down'},
-   {word:'HALT',row:4,col:4,dir:'down'},
-   {word:'ACT',row:2,col:0,dir:'across'},
-   {word:'CAT',row:7,col:2,dir:'across'},
-   {word:'HAT',row:0,col:2,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['RANCH','ARCH','ARC','CAN','CAR','RAN'],
- letters:['A','C','H','N','R'],
- placements:[
-   {word:'RANCH',row:2,col:2,dir:'across'},
-   {word:'ARCH',row:1,col:2,dir:'down'},
-   {word:'ARC',row:3,col:0,dir:'across'},
-   {word:'CAN',row:2,col:5,dir:'down'},
-   {word:'CAR',row:2,col:0,dir:'down'},
-   {word:'RAN',row:0,col:4,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['WATCH','CHAT','ACT','CAT','HAT','HAW'],
- letters:['A','C','H','T','W'],
- placements:[
-   {word:'WATCH',row:2,col:1,dir:'across'},
-   {word:'CHAT',row:1,col:5,dir:'down'},
-   {word:'ACT',row:2,col:2,dir:'down'},
-   {word:'CAT',row:0,col:3,dir:'down'},
-   {word:'HAT',row:4,col:0,dir:'across'},
-   {word:'HAW',row:4,col:0,dir:'down'}
- ],
- bonus:[]},
-{d:'EASY',
- w:['CLAWS','CLAW','SLAW','AWL','LAW','SAC','SAW','WAS'],
- letters:['A','C','L','S','W'],
- placements:[
-   {word:'CLAWS',row:4,col:0,dir:'across'},
-   {word:'CLAW',row:2,col:2,dir:'down'},
-   {word:'SLAW',row:4,col:4,dir:'down'},
-   {word:'AWL',row:6,col:4,dir:'across'},
-   {word:'LAW',row:6,col:6,dir:'down'},
-   {word:'SAC',row:2,col:0,dir:'across'},
-   {word:'SAW',row:7,col:2,dir:'across'},
-   {word:'WAS',row:0,col:0,dir:'down'}
- ],
- bonus:[]},
-// === MEDIUM (21-40) ===
-{d:'MEDIUM', w:['STONE','NOTES','TONES','ONSET','SNORE','TENOR'],
- bonus:['NOSE','NOTE','TONE','SORT','TORN','RENT','REST','NEST','TERN','ONES','SORE','ROSE','ROTE','SENT','TENS']},
-{d:'MEDIUM', w:['BREAD','BRAID','BRIDE','DRAPE','RAPID','DREAM'],
- bonus:['BEAR','DEAR','READ','DARE','BARE','RAID','PAID','IDEA','PAIR','RIPE','DRIP']},
-{d:'MEDIUM', w:['FLAME','SHELF','FLASH','FLESH','LEASH','FLAKE'],
- bonus:['LAME','MALE','HALF','LEAF','FAKE','SELF','LAKE','SALE','SEAL','SAKE']},
-{d:'MEDIUM', w:['TRAIN','PAINT','PRINT','DRAIN','GRAIN','PARTY'],
- bonus:['RAIN','TRIP','TRAP','RAPT','PAIR','PANT','RANG','RIND','GRIT','PRIG']},
-{d:'MEDIUM', w:['CLOUD','COULD','CLOAK','MODAL','MOULD','CLAMP'],
- bonus:['CLOD','LOUD','COLD','MOLD','LOAD','COAL','DUAL']},
-{d:'MEDIUM', w:['SPORT','STORM','PORTS','STOMP','TROOP','ROOST'],
- bonus:['PORT','SORT','STOP','POST','MOST','MOOR','ROOM','ROOT','TOSS']},
-{d:'MEDIUM', w:['CHAIR','CHARM','MARCH','RANCH','CHAIN','RICH'],
- bonus:['CHAR','ARCH','INCH','CHIN','HAIR','MAIN','RAIN','GAIN']},
-{d:'MEDIUM', w:['PLANT','PLANK','BLANK','ANKLE','THANK','FAINT'],
- bonus:['PLAN','TANK','BANK','KNIT','LINK','FLAN','TALK','LANE']},
-{d:'MEDIUM', w:['CRANE','TRACE','CRATE','REACT','GRACE','EXTRA'],
- bonus:['RACE','CARE','CART','ACRE','RATE','TEAR','GATE','RAGE','GEAR']},
-{d:'MEDIUM', w:['HOUSE','SHOUT','SOUTH','THOSE','MOIST','MOUTH'],
- bonus:['SHOT','HOST','HOSE','SHUT','THUS','MOST','OUST','MUST']},
-{d:'MEDIUM', w:['GLOBE','BELOW','ELBOW','BOWEL','NOBLE','BLOWN'],
- bonus:['LOBE','GLOW','BOWL','BONE','LONE','GONE','BLOW','BONG']},
-{d:'MEDIUM', w:['RIDGE','GRIND','BRIDE','BRING','DIRGE','BRINE'],
- bonus:['RIDE','GRID','GRIN','RING','RIND','BIND','BIRD']},
-{d:'MEDIUM', w:['BRAKE','BAKER','BREAK','CREAK','BLACK','CRACK'],
- bonus:['BAKE','CAKE','LACK','BACK','LAKE','LACE','RACE','BARK','BEAR']},
-{d:'MEDIUM', w:['TOWER','THREW','WORTH','THROW','WRATH','EARTH'],
- bonus:['TORE','WORE','RATE','HATE','HEAR','HEAT','TEAR','WEAR']},
-{d:'MEDIUM', w:['JUDGE','WEDGE','BUDGE','FUDGE','NUDGE','LEDGE'],
- bonus:['EDGE','DUNE','LUGE','HUGE','JUTE']},
-{d:'MEDIUM', w:['MAPLE','AMPLE','TRAMP','PLEAT','METAL','PLATE'],
- bonus:['PALM','LAMP','MALE','LAME','MEAL','MEAT','MATE','TEAM','TAPE']},
-{d:'MEDIUM', w:['QUEST','SQUID','QUIET','QUILT','QUITE','QUOTE'],
- bonus:['QUIT','SUIT','SITE','TILE','TIES']},
-{d:'MEDIUM', w:['SWIPE','SPICE','WRIST','CRISP','SWIFT','TWIST'],
- bonus:['WIPE','WISE','RISE','SPIT','TRIP','TIPS','STRIP','STIR']},
-{d:'MEDIUM', w:['REIGN','LINER','GRILL','LINGER','RING','GIRL'],
- bonus:['LINE','REIN','GRIN','GLEN','NINE']},
-{d:'MEDIUM', w:['HAZEL','BLAZE','GLAZE','ZEBRA','GRAZE','CRAZE'],
- bonus:['HAZE','GAZE','LAZE','RAZE','BARE','HEAR','REAL','HEAL']},
-// === HARD (41-55) ===
-{d:'HARD', w:['FOREST','SOFTER','FOSTER','FROSTY','STOREY','OYSTER'],
- bonus:['STORE','STORY','FROST','FORTY','FORTE','SORRY','FIERY','ROOST']},
-{d:'HARD', w:['CASTLE','CLOSET','LOCATE','SOCIAL','COASTAL','SOLACE'],
- bonus:['CLOSE','COAST','SCALE','LEAST','STEAL','STALE','TOAST','CLASP']},
-{d:'HARD', w:['BRIDGE','BRIGHT','FRIDGE','GERBIL','RIDDLE','BRIDLE'],
- bonus:['RIDGE','DIRGE','BRIDE','GRIEF','GREED','GLIDE']},
-{d:'HARD', w:['PLANET','MENTAL','RENTAL','GENTLE','PLENTY','TALENT'],
- bonus:['PLANT','PLATE','PANEL','METAL','MEANT','MENAT']},
-{d:'HARD', w:['TRAVEL','MARVEL','REVEAL','GRAVEL','VERBAL','VELVET'],
- bonus:['LATER','ALTER','ALERT','GRAVE','LEVER','REVEL']},
-{d:'HARD', w:['STREAM','MASTER','TAMPER','PLASTER','HAMSTER','STAMMER'],
- bonus:['SMART','STEAM','DREAM','CREAM','MARSH','MATER']},
-{d:'HARD', w:['DRAGON','GROUND','AROUND','PARDON','RANDOM','RANSOM'],
- bonus:['GRAND','ADORN','GLAND','ORGAN','MANOR','GROAN']},
-{d:'HARD', w:['WINTER','HUNTER','THIRTY','THIRST','WITHIN','WHITER'],
- bonus:['WRITE','THEIR','THREW','WRIST','RINSE','SHIRT']},
-{d:'HARD', w:['GARDEN','DANGER','WANDER','GANDER','WARNED','RANGED'],
- bonus:['GRAND','ANGER','RANGE','GRADE','DRANK']},
-{d:'HARD', w:['CHANGE','CHARGE','CHANCE','BRANCH','BLANCH','LAUNCH'],
- bonus:['RANCH','BEACH','REACH','CHAIN','CHEAP']},
-{d:'HARD', w:['BATTLE','RATTLE','CATTLE','BOTTLE','TURTLE','LITTLE'],
- bonus:['TABLE','TOTAL','TITLE','LATTE','TREAT']},
-{d:'HARD', w:['FLOWER','PLOWED','CLOVER','TOWEL','GLOWER','GROWER'],
- bonus:['LOWER','TOWER','POWER','COVER','LOVER','GROWL']},
-{d:'HARD', w:['MARKET','POCKET','ROCKET','BASKET','TICKET','BUCKET'],
- bonus:['MAKER','TAKER','BAKER']},
-{d:'HARD', w:['SILVER','QUIVER','SHIVER','DRIVER','CLEVER','GEYSER'],
- bonus:['LIVER','RIVER','DIVER','VIGOR']},
-{d:'HARD', w:['PARDON','COMMON','CANNON','CARBON','PATRON','FALCON'],
- bonus:['APRON','MANOR','CONAN','CRAMP']},
-];
-
 /* ═══════════════════════════════════════════════
    CROSSWORD LAYOUT ENGINE
    - Multiple perpendicular intersections OK
@@ -726,28 +421,88 @@ function layoutCrossword(wordStrings) {
     return placed;
 }
 
+
 /* ═══════════════════════════════════════════════
-   BUILD LEVELS
+   PROCEDURAL LEVEL GENERATOR — always 5 letters
    ═══════════════════════════════════════════════ */
-const LEVELS = LEVEL_DEFS.map(def => {
-    // Use hardcoded placements if provided, otherwise run layout engine
-    const placements = def.placements || layoutCrossword(def.w);
-    const placedWords = new Set(placements.map(p=>p.word));
-    const letters = new Set();
-    placements.forEach(p => { for(const ch of p.word) letters.add(ch); });
-    // Unplaced grid words + explicit bonus become bonus list
-    const bonusSet = new Set();
-    (def.bonus||[]).forEach(b => { const u=b.toUpperCase(); if(!placedWords.has(u)) bonusSet.add(u); });
-    def.w.forEach(w => { const u=w.toUpperCase(); if(!placedWords.has(u)) bonusSet.add(u); });
-    // Add bonus word letters to letter pool
-    bonusSet.forEach(b => { for(const ch of b) letters.add(ch); });
+const GRID_WORDS_BY_DIFF = { EASY:[5,6], MEDIUM:[7,8], HARD:[9,10] };
+
+// Pre-built 5-letter sets with known good word counts
+const LETTER_SETS = [
+    ['E','A','R','S','T'], ['S','T','E','A','M'], ['P','A','R','T','S'],
+    ['S','P','A','R','E'], ['S','T','O','N','E'], ['C','A','R','T','S'],
+    ['L','E','A','P','T'], ['S','M','A','R','T'], ['T','R','A','C','E'],
+    ['S','T','E','I','N'], ['R','O','A','S','T'], ['P','E','A','R','L'],
+    ['C','R','E','A','M'], ['S','T','O','R','E'], ['C','R','A','N','E'],
+    ['P','A','I','N','T'], ['G','R','A','N','T'], ['S','P','O','R','T'],
+    ['D','A','R','T','S'], ['S','T','A','R','K'], ['E','A','R','N','S'],
+    ['S','A','I','N','T'], ['C','L','E','A','R'], ['S','H','A','L','E'],
+    ['M','A','R','S','H'], ['B','R','A','N','D'], ['S','T','R','I','P'],
+    ['B','U','R','S','T'], ['T','R','A','I','N'], ['P','L','A','S','T'],
+    ['S','T','A','R','E'], ['G','R','I','S','T'], ['C','R','U','S','T'],
+    ['S','T','A','L','K'], ['D','R','I','N','K'], ['S','T','O','C','K'],
+    ['B','L','A','S','T'], ['P','L','A','N','K'], ['C','L','A','S','P'],
+    ['C','H','A','R','T'], ['S','W','O','R','D'], ['S','T','E','R','N'],
+    ['D','E','A','L','T'], ['P','L','A','N','T'], ['S','N','A','R','L'],
+    ['G','R','O','A','N'], ['D','R','I','F','T'], ['T','R','I','C','K'],
+    ['P','R','U','D','E'], ['C','L','A','M','P'],
+];
+
+function findWordsForLetters(letters) {
+    const avail = {};
+    letters.forEach(l => avail[l]=(avail[l]||0)+1);
+    const result = [];
+    for(const w of DICT) {
+        if(w.length < 3 || w.length > 5) continue;
+        const wc = {};
+        let ok = true;
+        for(const ch of w) {
+            wc[ch] = (wc[ch]||0)+1;
+            if(!avail[ch] || wc[ch] > avail[ch]) { ok=false; break; }
+        }
+        if(ok) result.push(w);
+    }
+    return result.sort((a,b) => b.length - a.length || a.localeCompare(b));
+}
+
+function generateLevel(difficulty) {
+    const [minW, maxW] = GRID_WORDS_BY_DIFF[difficulty];
+    const targetWords = minW + Math.floor(Math.random()*(maxW-minW+1));
+
+    // Try letter sets until we find one with enough words
+    const shuffled = shuffle([...LETTER_SETS]);
+    for(const letters of shuffled) {
+        const allWords = findWordsForLetters(letters);
+        if(allWords.length < targetWords) continue;
+
+        // Pick grid words: prefer longer words first, pick targetWords count
+        const gridWords = allWords.slice(0, targetWords);
+        const placements = layoutCrossword(gridWords);
+        if(placements.length < Math.min(targetWords, 4)) continue; // layout failed badly
+
+        // Remaining words become bonus
+        const placedSet = new Set(placements.map(p=>p.word));
+        const bonus = allWords.filter(w => !placedSet.has(w));
+
+        return {
+            difficulty: difficulty,
+            letters: [...letters],
+            words: placements,
+            bonus: bonus,
+        };
+    }
+    // Fallback: use first letter set
+    const letters = LETTER_SETS[0];
+    const allWords = findWordsForLetters(letters);
+    const placements = layoutCrossword(allWords.slice(0, minW));
+    const placedSet = new Set(placements.map(p=>p.word));
     return {
-        difficulty: def.d,
-        letters: def.letters || [...letters],
+        difficulty: difficulty,
+        letters: [...letters],
         words: placements,
-        bonus: [...bonusSet],
+        bonus: allWords.filter(w => !placedSet.has(w)),
     };
-});
+}
 
 /* ═══════════════════════════════════════════════
    SOUND ENGINE (Web Audio API — no external files)
@@ -932,6 +687,7 @@ function spawnConfetti() {
     }
 }
 
+
 /* ═══════════════════════════════════════════════
    GAME STATE
    ═══════════════════════════════════════════════ */
@@ -942,6 +698,8 @@ const G = {
     foundBonus: new Set(),
     grid: null, rows:0, cols:0,
     shuf: [],
+    difficulty: 'EASY',
+    currentLevel: null,
 };
 
 function shuffle(a) {
@@ -951,21 +709,24 @@ function shuffle(a) {
 }
 
 /* ═══════════════════════════════════════════════ */
-function init() {
-    G.lvl = parseInt(localStorage.getItem('wf_lv')||'1');
-    G.score = parseInt(localStorage.getItem('wf_sc')||'0');
-    if(G.lvl<1||G.lvl>LEVELS.length) G.lvl=1;
-    document.getElementById('lt').textContent = LEVELS.length;
+function startGame(diff) {
+    G.difficulty = diff;
+    G.lvl = 1;
+    G.score = 0;
+    document.getElementById('diffScreen').classList.add('hidden');
+    document.getElementById('gameWrap').style.display = '';
     load();
 }
 
+function init() {
+    // Show difficulty screen
+    document.getElementById('diffScreen').classList.remove('hidden');
+    document.getElementById('gameWrap').style.display = 'none';
+}
+
 function load() {
-    if(G.lvl>LEVELS.length) {
-        document.getElementById('gameWrap').innerHTML =
-            '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#fff;text-align:center;padding:40px"><h1 style="font-size:28px;margin-bottom:12px">Congratulations!</h1><p>You completed all levels!</p><p style="margin-top:12px">Final Score: <b>'+G.score+'</b></p></div>';
-        sendResult(); return;
-    }
-    const lv = LEVELS[G.lvl-1];
+    const lv = generateLevel(G.difficulty);
+    G.currentLevel = lv;
     G.found = new Set();
     G.foundBonus = new Set();
     G.sel=[]; G.drag=false; G.hints=3;
@@ -992,14 +753,11 @@ function buildGrid(lv) {
 function drawGrid() {
     const el=document.getElementById('grid'); el.innerHTML='';
     const gap=4;
-    // Measure available width and height
     const gridArea=document.querySelector('.grid-area');
     const availW=Math.min(window.innerWidth-24, gridArea?gridArea.clientWidth-8:400);
     const availH=gridArea?gridArea.clientHeight-8:300;
-    // Calculate cell size to fit both dimensions
     const szW=Math.floor((availW-(G.cols-1)*gap)/G.cols);
     const szH=Math.floor((availH-(G.rows-1)*gap)/G.rows);
-    // Allow cells to shrink to 22px for big grids, cap at 44px
     const sz=Math.max(Math.min(szW, szH, 44), 18);
     const fs=Math.max(Math.round(sz*0.44),9);
     el.style.gap=gap+'px';
@@ -1021,7 +779,6 @@ function drawWheel(lv) {
     const wEl=document.getElementById('wheel');
     const scrW=Math.min(window.innerWidth-32,380);
     const scrH=window.innerHeight;
-    // On short screens, shrink the wheel to leave room for grid
     const maxWheelH=Math.max(Math.min(scrH*0.28, 240), 140);
     const wSz=Math.min(scrW, maxWheelH);
     const lSz=Math.min(Math.round(wSz*0.18),46);
@@ -1089,7 +846,6 @@ function moveS(cx,cy){
     });
 }
 
-/* Check if a word can be formed from available letters */
 function canFormFromLetters(word, letters) {
     const avail = {};
     letters.forEach(l => avail[l] = (avail[l]||0)+1);
@@ -1104,7 +860,7 @@ function endS(){
     if(!G.drag) return;
     G.drag=false;
     const word=G.sel.map(i=>G.shuf[i]).join('');
-    const lv=LEVELS[G.lvl-1];
+    const lv=G.currentLevel;
     const cw=document.getElementById('cw');
 
     // Check grid words
@@ -1114,10 +870,8 @@ function endS(){
         G.score+=word.length*10;
         placeWord(match); hud();
         SFX.wordFound(); haptic([20,30,20]);
-        // Particles from the current-word pill
         const cwRect=cw.getBoundingClientRect();
         spawnParticles(cwRect.left+cwRect.width/2, cwRect.top, '#2ecc71', 12);
-        // Score bump
         document.getElementById('sc').classList.add('score-bump');
         setTimeout(()=>document.getElementById('sc').classList.remove('score-bump'),300);
         cw.textContent=word; cw.classList.add('ok');
@@ -1147,7 +901,6 @@ function endS(){
         document.getElementById('sc').classList.add('score-bump');
         setTimeout(()=>document.getElementById('sc').classList.remove('score-bump'),300);
         cw.textContent=word; cw.classList.add('bonus');
-        // Show bonus toast
         const toast=document.createElement('div'); toast.className='bonus-toast';
         toast.textContent='Bonus! +'+word.length*5;
         document.querySelector('.cur-word').appendChild(toast);
@@ -1184,7 +937,6 @@ function placeWord(wo){
         const c=wo.dir==='across'?wo.col+i:wo.col;
         const cell=document.querySelector('.cw-cell[data-r="'+r+'"][data-c="'+c+'"]');
         if(cell&&!cell.classList.contains('filled')){
-            // Staggered reveal — each letter pops in sequence
             setTimeout(()=>{
                 cell.classList.add('filled'); cell.textContent=wo.word[i];
                 cell.style.animationDelay='0s';
@@ -1197,7 +949,7 @@ function hud(){
     document.getElementById('sc').textContent=G.score;
     document.getElementById('lv').textContent=G.lvl;
     document.getElementById('hc').textContent=G.hints;
-    const lv=LEVELS[G.lvl-1];
+    const lv=G.currentLevel;
     const d=document.getElementById('diff');
     d.textContent=lv.difficulty;
     d.className='hdr-pill diff-pill diff-'+lv.difficulty;
@@ -1208,7 +960,7 @@ function hud(){
 
 function hint(){
     if(G.hints<=0) return;
-    const lv=LEVELS[G.lvl-1];
+    const lv=G.currentLevel;
     const uf=lv.words.filter(w=>!G.found.has(w.word));
     if(!uf.length) return;
     SFX.hint(); haptic([15,30,15]);
@@ -1223,13 +975,12 @@ function doShuf(){
     const btn=document.getElementById('shufBtn');
     btn.classList.add('spinning');
     setTimeout(()=>btn.classList.remove('spinning'),400);
-    drawWheel(LEVELS[G.lvl-1]); G.sel=[]; refSel();
+    drawWheel(G.currentLevel); G.sel=[]; refSel();
 }
 
 function showModal(){
     SFX.levelComplete(); haptic([30,50,30,50,30]);
     spawnConfetti();
-    // Second wave of confetti
     setTimeout(spawnConfetti, 400);
     document.getElementById('mSc').textContent=G.score;
     const bm=document.getElementById('bonusMsg');
@@ -1238,14 +989,14 @@ function showModal(){
 }
 function nextLv(){
     G.lvl++;
-    localStorage.setItem('wf_lv',G.lvl);
-    localStorage.setItem('wf_sc',G.score);
     document.getElementById('mBg').classList.remove('show');
     load();
 }
 function retryLv(){ document.getElementById('mBg').classList.remove('show'); load(); }
 
-function sendResult(){/* no-op in standalone */}
+function sendResult(){
+        console.log("Standalone — result:", {myScore, oppScore, won});
+    }
 
 document.addEventListener('mousemove',e=>moveS(e.clientX,e.clientY));
 document.addEventListener('touchmove',e=>{
@@ -1258,17 +1009,15 @@ document.getElementById('rtBtn').addEventListener('click',retryLv);
 document.getElementById('shufBtn').addEventListener('click',doShuf);
 document.getElementById('hintBtn').addEventListener('click',hint);
 
-// Redraw on resize/orientation change to keep grid fitting
 let _resizeT;
 window.addEventListener('resize', ()=>{
     clearTimeout(_resizeT);
     _resizeT=setTimeout(()=>{
-        if(G.lvl<=LEVELS.length){
-            drawGrid(); drawWheel(LEVELS[G.lvl-1]);
-            // Re-apply filled state
+        if(G.currentLevel){
+            drawGrid(); drawWheel(G.currentLevel);
             document.querySelectorAll('.cw-cell.has').forEach(cell=>{
                 const r=+cell.dataset.r, c=+cell.dataset.c;
-                for(const w of LEVELS[G.lvl-1].words){
+                for(const w of G.currentLevel.words){
                     for(let i=0;i<w.word.length;i++){
                         const wr=w.dir==='across'?w.row:w.row+i;
                         const wc=w.dir==='across'?w.col+i:w.col;
@@ -1284,6 +1033,7 @@ window.addEventListener('resize', ()=>{
 });
 
 init();
+
 </script>
 </body>
 </html>
